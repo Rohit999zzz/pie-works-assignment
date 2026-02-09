@@ -32,6 +32,95 @@ The database uses a normalized schema with Many-to-Many relationships for skills
 -   **Utilities**: TailwindCSS is used for rapid, consistent styling without writing custom CSS files.
 -   **State Management**: `AuthContext` provides global access to the logged-in user state.
 
+### 2.4 Database Schema (ERD)
+```mermaid
+erDiagram
+    MEMBERS ||--o{ MEMBER_SKILLS : has
+    MEMBERS ||--o{ NUDGES : receives
+    JOBS ||--o{ JOB_SKILLS : requires
+    JOBS ||--o{ NUDGES : generates
+    SKILLS ||--o{ MEMBER_SKILLS : "used in"
+    SKILLS ||--o{ JOB_SKILLS : "used in"
+    
+    MEMBERS {
+        int id PK
+        string email
+        string password_hash
+        string name
+        string location
+        string current_company
+        int experience_years
+    }
+    
+    JOBS {
+        int id PK
+        string title
+        string company
+        string location
+        int min_experience
+        text description
+    }
+    
+    SKILLS {
+        int id PK
+        string name
+    }
+    
+    MEMBER_SKILLS {
+        int member_id FK
+        int skill_id FK
+    }
+    
+    JOB_SKILLS {
+        int job_id FK
+        int skill_id FK
+    }
+    
+    NUDGES {
+        int id PK
+        int member_id FK
+        int job_id FK
+        int score
+        string reason
+        string status
+    }
+```
+
+### 2.5 System Architecture Diagram
+```mermaid
+graph TB
+    subgraph "Frontend (React)"
+        A[Browser] --> B[Dashboard]
+        A --> C[Profile Page]
+        A --> D[Login/Signup]
+        B --> E[AuthContext]
+        C --> E
+        D --> E
+    end
+    
+    subgraph "Backend (Node.js + Express)"
+        E --> F[API Routes]
+        F --> G[Auth Controller]
+        F --> H[Member Controller]
+        F --> I[Job Controller]
+        F --> J[Nudge Controller]
+        H --> K[Matching Service]
+        I --> K
+    end
+    
+    subgraph "Database (PostgreSQL)"
+        G --> L[(Members Table)]
+        H --> L
+        H --> M[(Skills Tables)]
+        I --> N[(Jobs Table)]
+        J --> O[(Nudges Table)]
+        K --> L
+        K --> M
+        K --> N
+        K --> O
+    end
+```
+
 ---
 
 ## 3. Core Logic & Algorithms
@@ -51,9 +140,42 @@ Each Member-Job pair is assigned a score (0-100) based on weighted criteria:
     -   *Logic*: Match between Member's `current_company` and Job's `company`.
     -   *Why*: Referrals are most effective when verifying someone you've worked with.
 
-**Threshold**: Only pairs with a **Score >= 20** are saved as "Attributes".
+**Threshold**: Only pairs with a **Score >= 20** are saved as "Nudges".
 
-### 3.2 Real-time Recalculation & Cleanup
+### 3.2 Matching Workflow Diagram
+```mermaid
+sequenceDiagram
+    participant User
+    participant Frontend
+    participant API
+    participant MatchingService
+    participant Database
+    
+    User->>Frontend: Update Profile (Skills/Location)
+    Frontend->>API: PUT /api/members/:id
+    API->>Database: Update member data
+    API->>MatchingService: matchMemberToJobs(memberId)
+    
+    MatchingService->>Database: Fetch member + skills
+    MatchingService->>Database: Fetch all jobs + skills
+    
+    loop For each job
+        MatchingService->>MatchingService: Calculate score (Skills + Location + Company)
+        alt Score >= 20
+            MatchingService->>Database: Insert/Update Nudge
+        end
+    end
+    
+    MatchingService->>Database: Delete invalid pending nudges
+    MatchingService-->>API: Return success
+    API-->>Frontend: 200 OK
+    Frontend->>API: GET /api/members/:id/nudges
+    API->>Database: Fetch updated nudges
+    Database-->>Frontend: Return nudge list
+    Frontend->>User: Display updated Dashboard
+```
+
+### 3.3 Real-time Recalculation & Cleanup
 To ensure the dashboard is always accurate, the matching logic is event-driven:
 -   **Trigger**: Whenever a User updates their Profile (PUT `/api/members/:id`).
 -   **Step 1 (Cleanup)**: The system executing a *Cleanup Routine* to delete 'pending' Nudges that no longer meet the matching criteria (e.g., user moved cities).
