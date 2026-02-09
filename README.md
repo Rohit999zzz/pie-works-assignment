@@ -10,6 +10,7 @@
 Pieworks is a full-stack web application designed to intelligently match employees ("Members") with open job opportunities ("Jobs") at their company or partner companies. It facilitates the referral process by generating "Nudges" — smart recommendations based on skill overlaps, location, and alumni status.
 
 ### Demo Video
+https://github.com/user-attachments/assets/2d344140-833c-4e71-8942-7c5c7edaa4e8
 <video width="640" height="360" controls>
   <source src="https://github.com/user-attachments/assets/2d344140-833c-4e71-8942-7c5c7edaa4e8" type="video/mp4">
 </video>
